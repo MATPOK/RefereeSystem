@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens; // Do szyfrowania
 using RefereeSystem.Components; // Twój g³ówny komponent Blazor
 using RefereeSystem.Models; // Tutaj jest Twój RefereeDbContext
 using System.Text;
+using Blazored.LocalStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,13 @@ if (string.IsNullOrEmpty(connectionString))
 
 builder.Services.AddDbContext<RefereeDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+builder.Services.AddBlazoredLocalStorage();
+
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri("https://localhost:7292/")
+});
 
 // C. Konfiguracja Logowania (JWT)
 var jwtKey = builder.Configuration.GetSection("AppSettings:Token").Value;

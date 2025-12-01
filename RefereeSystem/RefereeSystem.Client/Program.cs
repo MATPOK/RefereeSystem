@@ -1,20 +1,19 @@
-using Blazored.LocalStorage;
-using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Blazored.LocalStorage; // To naprawia Twój b³¹d
+using Microsoft.AspNetCore.Components.Authorization;
 using RefereeSystem.Client;
-using RefereeSystem.Client.Services; // Tu jest nasz AuthProvider
+using RefereeSystem.Client.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // 1. Konfiguracja HttpClient - Adres Twojego API
-// UWAGA: Musi wskazywaæ na adres, pod którym uruchamia siê Twój Backend (zwykle localhost:7xxx)
-// Pobieramy go dynamicznie z adresu, z którego za³adowano stronê.
+// To pozwala Clientowi "rozmawiaæ" z Serverem
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
-// 2. Dodajemy LocalStorage (do zapisu tokena)
+// 2. Dodajemy LocalStorage (TO JEST TA BRAKUJ¥CA CZÊŒÆ)
 builder.Services.AddBlazoredLocalStorage();
 
-// 3. Dodajemy autoryzacjê
+// 3. Dodajemy autoryzacjê i nasz CustomAuthStateProvider
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 
