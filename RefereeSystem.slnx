@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RefereeSystem/RefereeSystem.Client/RefereeSystem.Client.csproj" />
+  <Project Path="RefereeSystem/RefereeSystem/RefereeSystem.csproj" />
+</Solution>

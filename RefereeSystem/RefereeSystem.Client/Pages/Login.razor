@@ -1,0 +1,67 @@
+﻿@page "/login"
+@using RefereeSystem.Client.Models
+@using Blazored.LocalStorage
+@using Microsoft.AspNetCore.Components.Authorization
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+
+<h3>Logowanie do Systemu Obsad</h3>
+
+<div class="card" style="width: 400px;">
+    <div class="card-body">
+        <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            <div class="mb-3">
+                <label>Email</label>
+                <InputText @bind-Value="loginModel.Email" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label>Hasło</label>
+                <InputText @bind-Value="loginModel.Password" type="password" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Zaloguj się</button>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-2">@errorMessage</div>
+            }
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private LoginDto loginModel = new LoginDto();
+    private string errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+
+        // 1. Wyślij zapytanie do API
+        var response = await Http.PostAsJsonAsync("api/auth/login", loginModel);
+
+        if (response.IsSuccessStatusCode)
+        {
+            // 2. Odczytaj token z odpowiedzi
+            var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+            // 3. Zapisz token w przeglądarce
+            await LocalStorage.SetItemAsync("authToken", result.Token);
+
+            // 4. Odśwież stan autoryzacji (wymuś przerysowanie)
+            await AuthStateProvider.GetAuthenticationStateAsync();
+
+            // 5. Przekieruj na stronę główną
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Błąd logowania. Sprawdź email i hasło.";
+        }
+    }
+}
