@@ -19,23 +19,40 @@ namespace RefereeSystem.Client.Services
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            // 1. Pobierz token z pamięci przeglądarki
             string token = await _localStorage.GetItemAsync<string>("authToken");
 
-            // 2. Jeśli brak tokena -> Użytkownik niezalogowany
             if (string.IsNullOrEmpty(token))
             {
+                _http.DefaultRequestHeaders.Authorization = null;
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
 
-            // 3. Jeśli jest token -> Dodaj go do nagłówka każdego zapytania HTTP
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", token);
-
-            // 4. Zwróć stan "Zalogowany"
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt")));
         }
 
-        // Metoda pomocnicza do czytania danych z tokena (kto to jest, jaka rola)
+        // ==========================================
+        // NOWE METODY DO POWIADAMIANIA O ZMIANACH
+        // ==========================================
+
+        public void NotifyUserLogin(string token)
+        {
+            var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
+            var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
+
+            // To jest kluczowe! Powiadamiamy wszystkich (w tym NavMenu), że stan się zmienił
+            NotifyAuthenticationStateChanged(authState);
+        }
+
+        public void NotifyUserLogout()
+        {
+            var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
+            var authState = Task.FromResult(new AuthenticationState(anonymousUser));
+
+            NotifyAuthenticationStateChanged(authState);
+        }
+
+        // Metody pomocnicze bez zmian
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
         {
             var payload = jwt.Split('.')[1];

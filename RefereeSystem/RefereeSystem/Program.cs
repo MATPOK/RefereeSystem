@@ -81,6 +81,8 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
+app.MapStaticAssets();
+
 // E. Uruchamiamy Logowanie i Autoryzacjê (Kolejnoœæ jest wa¿na!)
 app.UseAuthentication(); // Kto to jest?
 app.UseAuthorization();  // Co mo¿e robiæ?

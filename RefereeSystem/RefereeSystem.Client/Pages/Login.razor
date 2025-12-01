@@ -1,17 +1,21 @@
 ﻿@page "/login"
+@rendermode InteractiveWebAssembly
 @using RefereeSystem.Client.Models
 @using Blazored.LocalStorage
 @using Microsoft.AspNetCore.Components.Authorization
+@using RefereeSystem.Client.Services
 @inject HttpClient Http
 @inject ILocalStorageService LocalStorage
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavManager
 
+
 <h3>Logowanie do Systemu Obsad</h3>
 
 <div class="card" style="width: 400px;">
     <div class="card-body">
-        <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+        @* PONIŻEJ KLUCZOWA ZMIANA: FormName="loginForm" *@
+        <EditForm Model="@loginModel" OnValidSubmit="HandleLogin" FormName="loginForm">
             <DataAnnotationsValidator />
 
             <div class="mb-3">
@@ -42,21 +46,20 @@
     {
         errorMessage = null;
 
-        // 1. Wyślij zapytanie do API
         var response = await Http.PostAsJsonAsync("api/auth/login", loginModel);
 
         if (response.IsSuccessStatusCode)
         {
-            // 2. Odczytaj token z odpowiedzi
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
 
-            // 3. Zapisz token w przeglądarce
+            // 1. Zapisz w LocalStorage
             await LocalStorage.SetItemAsync("authToken", result.Token);
 
-            // 4. Odśwież stan autoryzacji (wymuś przerysowanie)
-            await AuthStateProvider.GetAuthenticationStateAsync();
+            // 2. KLUCZOWA ZMIANA: Powiadom system o zalogowaniu!
+            // Rzutujemy providera na naszą klasę, żeby użyć metody NotifyUserLogin
+            (AuthStateProvider as CustomAuthStateProvider).NotifyUserLogin(result.Token);
 
-            // 5. Przekieruj na stronę główną
+            // 3. Przekieruj
             NavManager.NavigateTo("/");
         }
         else

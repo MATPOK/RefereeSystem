@@ -55,13 +55,13 @@
 
     private async Task Logout()
     {
-        // 1. Usuń token z pamięci
+        // 1. Usuń token
         await LocalStorage.RemoveItemAsync("authToken");
 
-        // 2. Wymuś odświeżenie stanu autoryzacji
-        await AuthStateProvider.GetAuthenticationStateAsync();
+        // 2. Powiadom system o wylogowaniu
+        (AuthStateProvider as CustomAuthStateProvider).NotifyUserLogout();
 
-        // 3. Przekieruj na stronę główną
+        // 3. Przekieruj
         NavManager.NavigateTo("/");
     }
 }

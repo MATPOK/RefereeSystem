@@ -25,25 +25,28 @@ namespace RefereeSystem.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto request)
         {
-            // 1. Szukamy użytkownika po emailu
+            // Czyścimy input od użytkownika (usuwamy spacje i zmniejszamy litery)
+            var cleanEmail = request.Email.ToLower().Trim();
+
+            // Szukamy w bazie (również ignorując wielkość liter w bazie)
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
 
             if (user == null)
             {
-                return BadRequest("Nie znaleziono użytkownika.");
+                // DEBUG: Pokażmy w konsoli serwera, czego szukaliśmy, a co jest w bazie
+                Console.WriteLine($"[LOGOWANIE] Nie znaleziono emaila: '{cleanEmail}'");
+                Console.WriteLine($"[LOGOWANIE] Liczba userów w bazie: {_context.Users.Count()}");
+                return BadRequest($"Nie znaleziono użytkownika o emailu: {cleanEmail}");
             }
 
-            // 2. Weryfikujemy hasło (korzystamy z Twojego PasswordHelpera)
+            // ... reszta kodu (weryfikacja hasła) bez zmian ...
             if (!PasswordHelper.VerifyPassword(request.Password, user.PasswordHash))
             {
                 return BadRequest("Błędne hasło.");
             }
 
-            // 3. Generujemy Token JWT
             var token = CreateToken(user);
-
-            // Zwracamy token oraz rolę (przydatne dla frontendu)
             return Ok(new { token, role = user.Role, userId = user.Id });
         }
 
@@ -65,6 +68,14 @@ namespace RefereeSystem.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
             return Ok("Użytkownik dodany.");
+        }
+
+        //DO USUNIECIA - do testów---------------------------------------------------------------------------
+        [HttpGet("test-hash")]
+        public IActionResult GetTestHash(string password)
+        {
+            var hash = PasswordHelper.HashPassword(password);
+            return Ok(hash);
         }
 
         private string CreateToken(User user)
