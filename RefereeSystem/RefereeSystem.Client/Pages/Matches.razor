@@ -79,7 +79,7 @@ else
                                     <option value="0">-- Wybierz --</option>
                                     @foreach (var r in refereesList)
                                     {
-                                        <option value="@r.Id">@r.FirstName @r.LastName (@r.Id)</option>
+                                        <option value="@r.Id">@r.FirstName @r.LastName (@r.City)</option>
                                     }
                                 </select>
                             </div>
@@ -92,7 +92,7 @@ else
                                     <option value="0">-- Wybierz --</option>
                                     @foreach (var r in refereesList)
                                     {
-                                        <option value="@r.Id">@r.FirstName @r.LastName</option>
+                                        <option value="@r.Id">@r.FirstName @r.LastName (@r.City)</option>
                                     }
                                 </select>
                             </div>
@@ -105,7 +105,7 @@ else
                                     <option value="0">-- Wybierz --</option>
                                     @foreach (var r in refereesList)
                                     {
-                                        <option value="@r.Id">@r.FirstName @r.LastName</option>
+                                        <option value="@r.Id">@r.FirstName @r.LastName (@r.City)</option>
                                     }
                                 </select>
                             </div>
@@ -120,7 +120,7 @@ else
                                     <option value="0">-- Brak --</option>
                                     @foreach (var r in refereesList)
                                     {
-                                        <option value="@r.Id">@r.FirstName @r.LastName</option>
+                                        <option value="@r.Id">@r.FirstName @r.LastName (@r.City)</option>
                                     }
                                 </select>
                             </div>

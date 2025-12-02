@@ -29,7 +29,8 @@ namespace RefereeSystem.Controllers
                 {
                     Id = u.Id,
                     FirstName = u.FirstName,
-                    LastName = u.LastName
+                    LastName = u.LastName,
+                    City = u.City
                 }) // Pobieramy tylko potrzebne pola
                 .ToListAsync();
         }
