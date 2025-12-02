@@ -7,6 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
+
 namespace RefereeSystem.Controllers
 {
     [Route("api/[controller]")]
@@ -53,21 +54,22 @@ namespace RefereeSystem.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] User user)
         {
-            // Sprawdzamy czy email już istnieje
+            // 1. Sprawdź czy email zajęty
             if (await _context.Users.AnyAsync(u => u.Email == user.Email))
             {
-                return BadRequest("Taki email już istnieje.");
+                return BadRequest("Taki email jest już zajęty.");
             }
 
-            // Hashujemy hasło
+            // 2. Hashowanie hasła
             user.PasswordHash = PasswordHelper.HashPassword(user.PasswordHash);
 
-            // Ustawiamy domyślną rolę jeśli pusta (opcjonalnie)
-            if (string.IsNullOrEmpty(user.Role)) user.Role = "Referee";
+            // 3. WYMUSZENIE ROLI GOŚCIA (Zabezpieczenie)
+            user.Role = "Guest";
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            return Ok("Użytkownik dodany.");
+
+            return Ok(new { message = "Konto utworzone. Oczekuje na akceptację administratora." });
         }
 
         //DO USUNIECIA - do testów---------------------------------------------------------------------------
@@ -77,6 +79,7 @@ namespace RefereeSystem.Controllers
             var hash = PasswordHelper.HashPassword(password);
             return Ok(hash);
         }
+
 
         private string CreateToken(User user)
         {

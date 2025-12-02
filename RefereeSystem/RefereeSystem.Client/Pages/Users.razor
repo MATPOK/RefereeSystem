@@ -1,0 +1,81 @@
+﻿@page "/users"
+@rendermode InteractiveWebAssembly
+@using RefereeSystem.Client.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")] // Tylko Admin tu wejdzie!
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>Zarządzanie Użytkownikami</h3>
+
+@if (users == null)
+{
+    <p><em>Ładowanie...</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Imię i Nazwisko</th>
+                <th>Email</th>
+                <th>Obecna Rola</th>
+                <th>Zmień Rolę</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in users)
+            {
+                <tr class="@(user.Role == "Guest" ? "table-warning" : "")">
+                    <td>@user.FirstName @user.LastName</td>
+                    <td>@user.Email</td>
+                    <td>
+                        @if(user.Role == "Guest") 
+                        { <span class="badge bg-warning text-dark">Oczekuje</span> }
+                        else 
+                        { <span class="badge bg-secondary">@user.Role</span> }
+                    </td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" @onclick='() => ChangeRole(user, "Referee")'>Sędzia</button>
+                            <button class="btn btn-sm btn-outline-info" @onclick='() => ChangeRole(user, "Scheduler")'>Obsadowca</button>
+                            <button class="btn btn-sm btn-outline-dark" @onclick='() => ChangeRole(user, "Admin")'>Admin</button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<User>? users;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        users = await Http.GetFromJsonAsync<List<User>>("api/users");
+    }
+
+    private async Task ChangeRole(User user, string newRole)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Czy na pewno zmienić rolę {user.Email} na {newRole}?")) return;
+
+        // Wysyłamy string w cudzysłowiu (JSON), dlatego używamy PostAsJson lub prostej serializacji
+        var response = await Http.PutAsJsonAsync($"api/users/{user.Id}/role", newRole);
+
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadUsers(); // Odśwież tabelę
+            await JS.InvokeVoidAsync("alert", "Rola zmieniona pomyślnie.");
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "Błąd zmiany roli.");
+        }
+    }
+}

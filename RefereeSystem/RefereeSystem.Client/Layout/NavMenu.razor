@@ -1,4 +1,5 @@
-﻿@using Blazored.LocalStorage
+﻿@using RefereeSystem.Client.Services
+@using Blazored.LocalStorage
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ILocalStorageService LocalStorage
@@ -23,15 +24,34 @@
 
         <AuthorizeView>
             <Authorized>
+
+                <AuthorizeView Roles="Admin,Scheduler" Context="managementContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="matches">
+                            <span class="bi bi-calendar-event-nav-menu" aria-hidden="true"></span> Mecze
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
                 <div class="nav-item px-3">
                     <span class="text-light small p-2">Zalogowany jako: @context.User.Identity?.Name</span>
                 </div>
+
                 <div class="nav-item px-3">
                     <button class="nav-link btn btn-link text-white" @onclick="Logout">
                         <span class="bi bi-box-arrow-right-nav-menu" aria-hidden="true"></span> Wyloguj
                     </button>
                 </div>
+
+                <AuthorizeView Roles="Admin" Context="adminContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="users">
+                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span> Użytkownicy
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
             </Authorized>
+
             <NotAuthorized>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="login">
