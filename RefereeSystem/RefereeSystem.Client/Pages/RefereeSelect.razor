@@ -1,0 +1,127 @@
+﻿@using RefereeSystem.Client.Models
+@using System.Text.RegularExpressions
+
+<div class="position-relative">
+    <input type="text"
+           class="form-control"
+           @bind="SearchText"
+           @bind:event="oninput"
+           @onfocus="() => isOpen = true"
+           @onblur="CloseDropdown"
+           placeholder="@Placeholder"
+           autocomplete="off" />
+
+    @if (isOpen)
+    {
+        <ul class="list-group position-absolute w-100 shadow" style="z-index: 1000; max-height: 200px; overflow-y: auto;">
+            @if (FilteredUsers.Any())
+            {
+                @foreach (var user in FilteredUsers)
+                {
+                    <li class="list-group-item list-group-item-action"
+                        style="cursor: pointer;"
+                        @onmousedown="() => SelectUser(user)">
+                        @((MarkupString)HighlightText($"{user.FirstName} {user.LastName} ({user.City})"))
+                    </li>
+                }
+            }
+            else
+            {
+                <li class="list-group-item text-muted small">Brak wyników</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter] public List<User> Users { get; set; } = new();
+    [Parameter] public int SelectedUserId { get; set; }
+    [Parameter] public EventCallback<int> SelectedUserIdChanged { get; set; } // Do two-way binding
+    [Parameter] public string Placeholder { get; set; } = "Wpisz nazwisko...";
+
+    private string SearchText { get; set; } = "";
+    private bool isOpen = false;
+
+    // Gdy komponent dostaje dane (np. przy edycji), ustawiamy tekst w inpucie
+    protected override void OnParametersSet()
+    {
+        // Ustawiamy tekst tylko jeśli input jest pusty i mamy wybrane ID (żeby nie nadpisywać w trakcie pisania)
+        if (SelectedUserId != 0 && string.IsNullOrEmpty(SearchText) && !isOpen)
+        {
+            var selected = Users.FirstOrDefault(u => u.Id == SelectedUserId);
+            if (selected != null)
+            {
+                SearchText = $"{selected.FirstName} {selected.LastName} ({selected.City})";
+            }
+        }
+        else if (SelectedUserId == 0 && !isOpen)
+        {
+            SearchText = "";
+        }
+    }
+
+    private IEnumerable<User> FilteredUsers
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(SearchText)) return Users;
+
+            // Jeśli tekst w inpucie to dokładnie imię i nazwisko wybranego sędziego, pokaż wszystkich
+            var selected = Users.FirstOrDefault(u => u.Id == SelectedUserId);
+            if (selected != null && SearchText == $"{selected.FirstName} {selected.LastName} ({selected.City})")
+                return Users;
+
+            // Filtrowanie po Imieniu, Nazwisku lub Mieście
+            return Users.Where(u =>
+                u.FirstName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                u.LastName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                u.City.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private async Task SelectUser(User user)
+    {
+        SelectedUserId = user.Id;
+        SearchText = $"{user.FirstName} {user.LastName} ({user.City})";
+        await SelectedUserIdChanged.InvokeAsync(user.Id); // Informujemy rodzica o zmianie
+        isOpen = false;
+    }
+
+    private async Task CloseDropdown()
+    {
+        // Małe opóźnienie, żeby zdążyło zarejestrować kliknięcie w opcję zanim lista zniknie
+        await Task.Delay(200);
+        isOpen = false;
+
+        // Walidacja przy wyjściu: jeśli tekst nie pasuje do żadnego ID, czyścimy
+        if (SelectedUserId == 0) SearchText = "";
+        else
+        {
+            var selected = Users.FirstOrDefault(u => u.Id == SelectedUserId);
+            // Jeśli tekst w inpucie różni się od wybranego (ktoś coś dopisał i wyszedł), przywróć poprawny
+            if (selected != null && !SearchText.Contains(selected.LastName))
+                SearchText = $"{selected.FirstName} {selected.LastName} ({selected.City})";
+        }
+    }
+
+    // Funkcja kolorująca tekst na żółto (<mark>)
+    private string HighlightText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(SearchText)) return text;
+
+        // Pomijamy kolorowanie, jeśli tekst jest identyczny z wyszukiwaniem (wybrany element)
+        var selected = Users.FirstOrDefault(u => u.Id == SelectedUserId);
+        if (selected != null && SearchText == $"{selected.FirstName} {selected.LastName} ({selected.City})")
+            return text;
+
+        try
+        {
+            // Znajdź frazę i otocz ją <mark>
+            return Regex.Replace(text, $"({Regex.Escape(SearchText)})", "<mark style='padding:0; background-color:#fff3cd;'>$1</mark>", RegexOptions.IgnoreCase);
+        }
+        catch
+        {
+            return text;
+        }
+    }
+}
