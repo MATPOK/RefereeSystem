@@ -6,6 +6,8 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 
+<PageTitle>Użytkownicy | RefAPP</PageTitle>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Zarządzanie Użytkownikami</h3>
     <span class="badge bg-primary fs-6">Znaleziono: @FilteredUsers.Count()</span>
@@ -30,7 +32,7 @@ else
                 <div class="col-md-6">
                     <input type="text"
                            class="form-control"
-                           placeholder="Szukaj po nazwisku, imieniu, emailu lub mieście..."
+                           placeholder="Wyszukaj użytkownika"
                            @bind="searchQuery"
                            @bind:event="oninput" />
                 </div>
@@ -38,6 +40,7 @@ else
                     <div class="btn-group btn-group-sm">
                         <button class="btn @(roleFilter == "" ? "btn-dark" : "btn-outline-dark")" @onclick='() => roleFilter = ""'>Wszyscy</button>
                         <button class="btn @(roleFilter == "Referee" ? "btn-dark" : "btn-outline-dark")" @onclick='() => roleFilter = "Referee"'>Sędziowie</button>
+                        <button class="btn @(roleFilter == "Scheduler" ? "btn-dark" : "btn-outline-dark")" @onclick='() => roleFilter = "Scheduler"'>Obsadowcy</button>
                         <button class="btn @(roleFilter == "Guest" ? "btn-warning" : "btn-outline-warning")" @onclick='() => roleFilter = "Guest"'>Oczekujący</button>
                     </div>
                 </div>

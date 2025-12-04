@@ -9,6 +9,8 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavManager
 
+<PageTitle>Login | RefAPP</PageTitle>
+
 <h3>Logowanie do Systemu Obsad</h3>
 
 <div class="card" style="width: 400px;">
@@ -42,6 +44,7 @@
 </div>
 
 @code {
+    
     private LoginDto loginModel = new LoginDto();
     private string? errorMessage;
 
