@@ -2,54 +2,151 @@
 @rendermode InteractiveWebAssembly
 @using RefereeSystem.Client.Models
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "Admin")] // Tylko Admin tu wejdzie!
+@attribute [Authorize(Roles = "Admin")]
 @inject HttpClient Http
 @inject IJSRuntime JS
 
-<h3>Zarządzanie Użytkownikami</h3>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Zarządzanie Użytkownikami</h3>
+    <span class="badge bg-primary fs-6">Znaleziono: @FilteredUsers.Count()</span>
+</div>
 
 @if (users == null)
 {
-    <p><em>Ładowanie...</em></p>
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+    </div>
 }
 else
 {
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Imię i Nazwisko</th>
-                <th>Email</th>
-                <th>Obecna Rola</th>
-                <th>Zmień Rolę</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var user in users)
-            {
-                <tr class="@(user.Role == "Guest" ? "table-warning" : "")">
-                    <td>@user.FirstName @user.LastName</td>
-                    <td>@user.Email</td>
-                    <td>
-                        @if(user.Role == "Guest") 
-                        { <span class="badge bg-warning text-dark">Oczekuje</span> }
-                        else 
-                        { <span class="badge bg-secondary">@user.Role</span> }
-                    </td>
-                    <td>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" @onclick='() => ChangeRole(user, "Referee")'>Sędzia</button>
-                            <button class="btn btn-sm btn-outline-info" @onclick='() => ChangeRole(user, "Scheduler")'>Obsadowca</button>
-                            <button class="btn btn-sm btn-outline-dark" @onclick='() => ChangeRole(user, "Admin")'>Admin</button>
-                        </div>
-                    </td>
+    <div class="card mb-3 bg-light">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-1 text-end">
+                    <i class="bi bi-search fs-4 text-muted"></i>
+                </div>
+                <div class="col-md-6">
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Szukaj po nazwisku, imieniu, emailu lub mieście..."
+                           @bind="searchQuery"
+                           @bind:event="oninput" />
+                </div>
+                <div class="col-md-5 d-flex justify-content-end">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn @(roleFilter == "" ? "btn-dark" : "btn-outline-dark")" @onclick='() => roleFilter = ""'>Wszyscy</button>
+                        <button class="btn @(roleFilter == "Referee" ? "btn-dark" : "btn-outline-dark")" @onclick='() => roleFilter = "Referee"'>Sędziowie</button>
+                        <button class="btn @(roleFilter == "Guest" ? "btn-warning" : "btn-outline-warning")" @onclick='() => roleFilter = "Guest"'>Oczekujący</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive shadow-sm">
+        <table class="table table-hover align-middle mb-0 bg-white">
+            <thead class="table-dark">
+                <tr>
+                    <th>Imię i Nazwisko</th>
+                    <th>Email</th>
+                    <th>Miasto</th>
+                    <th>Rola</th>
+                    <th class="text-center">Akcje</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @if (!FilteredUsers.Any())
+                {
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            <em>Nie znaleziono użytkowników pasujących do kryteriów.</em>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var user in FilteredUsers)
+                    {
+                        <tr class="@(user.Role == "Guest" ? "table-warning" : "")">
+                            <td class="fw-bold">@user.FirstName @user.LastName</td>
+                            <td>@user.Email</td>
+                            <td>@user.City</td>
+                            <td>
+                                @switch (user.Role)
+                                {
+                                    case "Guest":
+                                        <span class="badge bg-warning text-dark">Oczekuje</span>
+                                        break;
+                                    case "Admin":
+                                        <span class="badge bg-danger">Admin</span>
+                                        break;
+                                    case "Referee":
+                                        <span class="badge bg-success">Sędzia</span>
+                                        break;
+                                    case "Scheduler":
+                                        <span class="badge bg-info text-dark">Obsadowca</span>
+                                        break;
+                                    default:
+                                        <span class="badge bg-secondary">@user.Role</span>
+                                        break;
+                                }
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm me-2">
+                                    <button class="btn btn-outline-primary" @onclick='() => ChangeRole(user, "Referee")' title="Mianuj Sędzią">S</button>
+                                    <button class="btn btn-outline-info" @onclick='() => ChangeRole(user, "Scheduler")' title="Mianuj Obsadowcem">O</button>
+                                    <button class="btn btn-outline-dark" @onclick='() => ChangeRole(user, "Admin")' title="Mianuj Adminem">A</button>
+                                </div>
+                                <button class="btn btn-danger btn-sm" @onclick="() => DeleteUser(user)" title="Usuń konto">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
     private List<User>? users;
+
+    // Zmienne do filtrowania
+    private string searchQuery = "";
+    private string roleFilter = "";
+
+    // Dynamiczna lista filtrowana
+    private IEnumerable<User> FilteredUsers
+    {
+        get
+        {
+            if (users == null) return Enumerable.Empty<User>();
+
+            var result = users.AsEnumerable();
+
+            // 1. Filtr Roli
+            if (!string.IsNullOrEmpty(roleFilter))
+            {
+                result = result.Where(u => u.Role == roleFilter);
+            }
+
+            // 2. Filtr Tekstowy
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                result = result.Where(u =>
+                    (u.LastName?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.FirstName?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.Email?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.City?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+                );
+            }
+
+            return result;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -58,24 +155,54 @@ else
 
     private async Task LoadUsers()
     {
-        users = await Http.GetFromJsonAsync<List<User>>("api/users");
+        try
+        {
+            users = await Http.GetFromJsonAsync<List<User>>("api/users");
+            if (users != null)
+            {
+                users = users.OrderByDescending(u => u.Role == "Guest").ThenBy(u => u.LastName).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Błąd pobierania użytkowników: {ex.Message}");
+        }
     }
 
     private async Task ChangeRole(User user, string newRole)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", $"Czy na pewno zmienić rolę {user.Email} na {newRole}?")) return;
+        if (!await JS.InvokeAsync<bool>("confirm", $"Czy zmienić rolę {user.Email} na {newRole}?")) return;
 
-        // Wysyłamy string w cudzysłowiu (JSON), dlatego używamy PostAsJson lub prostej serializacji
         var response = await Http.PutAsJsonAsync($"api/users/{user.Id}/role", newRole);
 
         if (response.IsSuccessStatusCode)
         {
-            await LoadUsers(); // Odśwież tabelę
-            await JS.InvokeVoidAsync("alert", "Rola zmieniona pomyślnie.");
+            await LoadUsers();
         }
         else
         {
-            await JS.InvokeVoidAsync("alert", "Błąd zmiany roli.");
+            var msg = await response.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert", $"Błąd: {msg}");
+        }
+    }
+
+    private async Task DeleteUser(User user)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"UWAGA! Czy na pewno usunąć użytkownika {user.FirstName} {user.LastName}?");
+
+        if (confirmed)
+        {
+            var response = await Http.DeleteAsync($"api/users/{user.Id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadUsers();
+            }
+            else
+            {
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"Nie można usunąć: {errorMsg}");
+            }
         }
     }
 }

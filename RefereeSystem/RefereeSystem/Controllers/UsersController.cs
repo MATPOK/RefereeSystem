@@ -58,5 +58,32 @@ namespace RefereeSystem.Controllers
 
             return Ok(new { message = $"Zmieniono rolę na {newRole}" });
         }
+
+        // DELETE: api/users/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            // 1. Zabezpieczenie: Admin nie może usunąć samego siebie
+            var currentUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(currentUserIdString, out int currentUserId))
+            {
+                if (currentUserId == id)
+                {
+                    return BadRequest("Nie możesz usunąć własnego konta, będąc zalogowanym.");
+                }
+            }
+
+            // 2. Szukamy użytkownika
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            // 3. Usuwamy
+            // Dzięki "ON DELETE CASCADE" w bazie danych, usunięcie użytkownika
+            // automatycznie usunie też wszystkie jego obsady z tabeli Assignments.
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return NoContent(); // 204 No Content (Sukces)
+        }
     }
 }
