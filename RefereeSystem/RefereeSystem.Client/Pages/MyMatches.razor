@@ -1,0 +1,130 @@
+﻿@page "/my-matches"
+@using RefereeSystem.Client.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Referee,Admin,Scheduler")]
+@inject HttpClient Http
+
+<PageTitle>Moje mecze | RefAPP</PageTitle>
+
+<h3>Moje Mecze</h3>
+
+@if (isLoading)
+{
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else if (!upcomingMatches.Any() && !historyMatches.Any())
+{
+    <div class="alert alert-info mt-3">Nie masz żadnych przypisanych meczów w systemie.</div>
+}
+else
+{
+    @if (upcomingMatches.Any())
+    {
+        <h4 class="mt-4 text-primary"><i class="bi bi-calendar-check"></i> Nadchodzące</h4>
+        <div class="table-responsive shadow-sm mb-4">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-primary">
+                    <tr>
+                        <th>Data</th>
+                        <th>Mecz</th>
+                        <th>Lokalizacja</th>
+                        <th>Funkcja</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in upcomingMatches)
+                    {
+                        <tr>
+                            <td class="fw-bold">@m.MatchDate.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@m.HomeTeam - @m.AwayTeam</td>
+                            <td>@m.Location</td>
+                            <td><span class="badge @GetBadgeColor(m.Function)">@TranslateRole(m.Function)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (historyMatches.Any())
+    {
+        <h4 class="mt-4 text-secondary"><i class="bi bi-clock-history"></i> Archiwum</h4>
+        <div class="table-responsive shadow-sm">
+            <table class="table table-hover align-middle mb-0 bg-light text-muted">
+                <thead class="table-secondary">
+                    <tr>
+                        <th>Data</th>
+                        <th>Mecz</th>
+                        <th>Lokalizacja</th>
+                        <th>Funkcja</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in historyMatches)
+                    {
+                        <tr>
+                            <td>@m.MatchDate.ToString("dd.MM.yyyy")</td>
+                            <td>@m.HomeTeam - @m.AwayTeam</td>
+                            <td>@m.Location</td>
+                            <td>@TranslateRole(m.Function)</td>
+                            <td><small>@m.Status</small></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private List<RefereeMatchDto> upcomingMatches = new();
+    private List<RefereeMatchDto> historyMatches = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Pobieramy wszystko z procedury
+            var allMatches = await Http.GetFromJsonAsync<List<RefereeMatchDto>>("api/assignments/my-matches");
+
+            if (allMatches != null)
+            {
+                var now = DateTime.Now;
+
+                // Sortujemy i dzielimy we Frontendzie
+                upcomingMatches = allMatches
+                    .Where(m => m.MatchDate >= now)
+                    .OrderBy(m => m.MatchDate)
+                    .ToList();
+
+                historyMatches = allMatches
+                    .Where(m => m.MatchDate < now)
+                    .OrderByDescending(m => m.MatchDate)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Błąd: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string TranslateRole(string role) => role switch
+    {
+        "MAIN" => "Sędzia Główny",
+        "ASST1" => "Asystent 1",
+        "ASST2" => "Asystent 2",
+        "TECH" => "Techniczny",
+        _ => role
+    };
+
+    private string GetBadgeColor(string role) => role == "MAIN" ? "bg-danger" : "bg-success";
+}

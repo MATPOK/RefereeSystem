@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RefereeSystem.Models;
+using System.Security.Claims;
 
 
 namespace RefereeSystem.Controllers
@@ -100,6 +101,25 @@ namespace RefereeSystem.Controllers
                 await _context.SaveChangesAsync();
             }
             return Ok();
+        }
+
+        [HttpGet("my-matches")]
+        [Authorize(Roles = "Referee,Admin,Scheduler")]
+        public async Task<ActionResult<IEnumerable<RefereeMatchDto>>> GetMyMatches()
+        {
+            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdString, out int userId))
+            {
+                return Unauthorized();
+            }
+
+            // UŻYCIE PROCEDURY SKŁADOWANEJ (Funkcji SQL)
+            // EF Core automatycznie zmapuje kolumny z SQL na właściwości klasy RefereeMatchDto
+            var myMatches = await _context.Database
+                .SqlQuery<RefereeMatchDto>($"SELECT * FROM get_my_matches({userId})")
+                .ToListAsync();
+
+            return Ok(myMatches);
         }
     }
 }
