@@ -1,4 +1,9 @@
-ï»¿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@using RefereeSystem.Client.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+@implements IDisposable
 
 <div class="page">
     <div class="sidebar">
@@ -6,7 +11,17 @@
     </div>
 
     <main>
-        <div class="top-row px-4">
+        <div class="top-row px-4 d-flex justify-content-between">
+            <div>
+                @if (timeLeft.TotalSeconds > 0)
+                {
+                    <span class="@GetTimerColor() fw-bold">
+                        <i class="bi bi-clock-history me-1"></i>
+                        Sesja wygasa za: @timeLeft.ToString(@"mm\:ss")
+                    </span>
+                }
+            </div>
+
             <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
         </div>
 
@@ -16,8 +31,92 @@
     </main>
 </div>
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">ðŸ—™</span>
-</div>
+@code {
+    private System.Timers.Timer? _timer;
+    private DateTime tokenExpiration;
+    private TimeSpan timeLeft;
+
+    protected override async Task OnInitializedAsync()
+    {
+        NavManager.LocationChanged += OnLocationChanged;
+
+        // Pobierz datê wygaœniêcia na starcie
+        await UpdateExpirationDate();
+
+        // Uruchom zegar (tyka co 1 sekundê)
+        _timer = new System.Timers.Timer(1000);
+        _timer.Elapsed += async (sender, e) => await OnTimerTick();
+        _timer.AutoReset = true;
+        _timer.Enabled = true;
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Przy zmianie strony odœwie¿ datê (bo mo¿e token siê odœwie¿y³ lub zmieni³)
+        await UpdateExpirationDate();
+        await OnTimerTick(); // Wymuœ natychmiastowe przeliczenie
+    }
+
+    private async Task UpdateExpirationDate()
+    {
+        // SprawdŸ, czy provider to faktycznie nasza customowa klasa
+        if (AuthStateProvider is CustomAuthStateProvider authProvider)
+        {
+            tokenExpiration = await authProvider.GetTokenExpirationAsync();
+        }
+        else
+        {
+            // Jeœli to ServerAuthenticationStateProvider (np. podczas prerenderowania),
+            // nie rób nic lub ustaw domyœln¹ wartoœæ.
+            tokenExpiration = DateTime.MinValue;
+        }
+    }
+
+    private async Task OnTimerTick()
+    {
+        if (tokenExpiration == DateTime.MinValue)
+        {
+            timeLeft = TimeSpan.Zero;
+        }
+        else
+        {
+            // Oblicz ró¿nicê: Kiedy wygasa - Aktualny czas UTC
+            var diff = tokenExpiration - DateTime.UtcNow;
+
+            if (diff.TotalSeconds > 0)
+            {
+                timeLeft = diff;
+            }
+            else
+            {
+                // CZAS MIN¥£!
+                timeLeft = TimeSpan.Zero;
+                _timer.Stop();
+
+                // Wymuœ wylogowanie (tylko jeœli mamy custom providera)
+                if (AuthStateProvider is CustomAuthStateProvider authProvider)
+                {
+                    await authProvider.CheckTokenExpiration();
+                    NavManager.NavigateTo("/login");
+                }
+            }
+        }
+
+        // Wa¿ne: Musimy powiedzieæ Blazorowi, ¿e zmienne siê zmieni³y i trzeba przerysowaæ licznik
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Dodatek wizualny: Zmienia kolor na czerwony, gdy zosta³o mniej ni¿ 2 minuty
+    private string GetTimerColor()
+    {
+        if (timeLeft.TotalMinutes < 2) return "text-danger"; // Czerwony
+        if (timeLeft.TotalMinutes < 5) return "text-warning"; // ¯ó³ty/Pomarañczowy
+        return "text-success"; // Zielony
+    }
+
+    public void Dispose()
+    {
+        NavManager.LocationChanged -= OnLocationChanged;
+        _timer?.Dispose();
+    }
+}

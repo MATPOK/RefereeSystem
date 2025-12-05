@@ -17,64 +17,80 @@ namespace RefereeSystem.Client.Services
             _http = http;
         }
 
-        // Ta metoda uruchamia się przy odświeżeniu strony (F5)
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            // Pobieramy token z pamięci przeglądarki
             string token = await _localStorage.GetItemAsync<string>("authToken");
 
-            // Jeśli brak tokena -> Ustawiamy HttpClienta na "anonimowy" i zwracamy pusty stan
+            // 1. Sprawdź czy token w ogóle istnieje
             if (string.IsNullOrEmpty(token))
             {
-                _http.DefaultRequestHeaders.Authorization = null;
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return GenerateEmptyState();
             }
 
-            // Jeśli jest token -> Doklejamy go do nagłówka i zwracamy stan "zalogowany"
+            // 2. NOWOŚĆ: Sprawdź czy token nie wygasł!
+            if (IsTokenExpired(token))
+            {
+                // Jeśli wygasł, usuwamy go i wylogowujemy użytkownika
+                await _localStorage.RemoveItemAsync("authToken");
+                return GenerateEmptyState();
+            }
+
+            // 3. Jeśli wszystko OK, zaloguj
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", token);
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt")));
         }
 
-        // ==========================================
-        // METODY DO POWIADAMIANIA O ZMIANACH (LOGOWANIE / WYLOGOWANIE)
-        // ==========================================
+        // Metoda pomocnicza do zwracania stanu "wylogowany"
+        private AuthenticationState GenerateEmptyState()
+        {
+            _http.DefaultRequestHeaders.Authorization = null;
+            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+        }
 
         public void NotifyUserLogin(string token)
         {
             var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
             var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
 
-            // <<< NAPRAWA: To jest ta linijka, której brakowało! >>>
-            // Natychmiast po zalogowaniu "uzbrajamy" HttpClienta w token.
-            // Bez tego, pierwsze zapytanie po zalogowaniu poleci bez tokena (błąd 401).
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", token);
-
-            // Powiadamiamy widoki (NavMenu, AuthorizeView), że stan się zmienił
             NotifyAuthenticationStateChanged(authState);
         }
 
         public void NotifyUserLogout()
         {
-            var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
-            var authState = Task.FromResult(new AuthenticationState(anonymousUser));
-
-            // <<< NAPRAWA: Tutaj czyścimy nagłówek >>>
-            // Żeby po wylogowaniu nikt nie mógł wysłać zapytania ze starym tokenem
+            var authState = Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
             _http.DefaultRequestHeaders.Authorization = null;
-
             NotifyAuthenticationStateChanged(authState);
         }
 
-        // ==========================================
-        // POMOCNICZE (Parsowanie Tokena JWT)
-        // ==========================================
+        // --- SPRAWDZANIE DATY WAŻNOŚCI (NOWA METODA) ---
+        private bool IsTokenExpired(string token)
+        {
+            try
+            {
+                var claims = ParseClaimsFromJwt(token);
+                var expClaim = claims.FirstOrDefault(c => c.Type == "exp");
+
+                if (expClaim == null) return false; // Brak daty ważności = nieważny/podejrzany, albo uznajemy że wieczny
+
+                // 'exp' w JWT to liczba sekund od 1970 roku (Unix Timestamp)
+                var expSeconds = long.Parse(expClaim.Value);
+                var expDate = DateTimeOffset.FromUnixTimeSeconds(expSeconds).UtcDateTime;
+
+                // Jeśli data wygaśnięcia jest wcześniejsza niż "teraz", to token jest przeterminowany
+                return expDate <= DateTime.UtcNow;
+            }
+            catch
+            {
+                return true; // Jeśli wystąpił błąd parsowania, uznajmy token za nieważny
+            }
+        }
+
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
         {
             var payload = jwt.Split('.')[1];
             var jsonBytes = ParseBase64WithoutPadding(payload);
             var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
-
-            // To proste parsowanie wyciąga role i inne dane z tokena
             return keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value.ToString()));
         }
 
@@ -86,6 +102,49 @@ namespace RefereeSystem.Client.Services
                 case 3: base64 += "="; break;
             }
             return Convert.FromBase64String(base64);
+        }
+
+        // Nowa metoda publiczna do wywoływania ręcznego sprawdzenia
+        public async Task CheckTokenExpiration()
+        {
+            var token = await _localStorage.GetItemAsync<string>("authToken");
+
+            if (!string.IsNullOrEmpty(token) && IsTokenExpired(token))
+            {
+                // Jeśli token wygasł -> wyloguj
+                await Logout();
+            }
+        }
+
+        // Metoda pomocnicza, żeby nie powielać kodu wylogowania
+        private async Task Logout()
+        {
+            await _localStorage.RemoveItemAsync("authToken");
+            _http.DefaultRequestHeaders.Authorization = null;
+            var authState = Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
+            NotifyAuthenticationStateChanged(authState);
+        }
+
+        // Nowa metoda pomocnicza do pobrania daty wygaśnięcia
+        public async Task<DateTime> GetTokenExpirationAsync()
+        {
+            var token = await _localStorage.GetItemAsync<string>("authToken");
+            if (string.IsNullOrEmpty(token)) return DateTime.MinValue;
+
+            try
+            {
+                var claims = ParseClaimsFromJwt(token);
+                var exp = claims.FirstOrDefault(c => c.Type == "exp");
+                if (exp == null) return DateTime.MinValue;
+
+                var expSeconds = long.Parse(exp.Value);
+                // Tokeny JWT używają czasu UTC
+                return DateTimeOffset.FromUnixTimeSeconds(expSeconds).UtcDateTime;
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
         }
     }
 }

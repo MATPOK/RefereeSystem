@@ -3,13 +3,28 @@
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(Program).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
-            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <div class="alert alert-danger m-4">
+                            Twoja sesja wygasła lub nie jesteś zalogowany.
+                            <a href="login" class="alert-link">Zaloguj się ponownie</a>.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning m-4" role="alert">
+                            Nie masz uprawnień do oglądania tej strony.
+                        </div>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
         </Found>
         <NotFound>
             <PageTitle>Not found</PageTitle>
-            <LayoutView Layout="@typeof(Layout.MainLayout)">
-                <p role="alert">Sorry, there's nothing at this address.</p>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert" class="p-4">Przepraszamy, pod tym adresem nic nie ma.</p>
             </LayoutView>
         </NotFound>
     </Router>

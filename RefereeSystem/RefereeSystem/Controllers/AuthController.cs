@@ -102,7 +102,9 @@ namespace RefereeSystem.Controllers
 
             var token = new JwtSecurityToken(
                 claims: claims,
-                expires: DateTime.Now.AddDays(1),
+                // TUTAJ ZMIANA: Ustawiamy czas wygasania (np. 1 godzina od teraz)
+                // Zaleca się używanie DateTime.UtcNow zamiast DateTime.Now dla spójności serwerowej
+                expires: DateTime.UtcNow.AddMinutes(1),
                 signingCredentials: creds
             );
 
