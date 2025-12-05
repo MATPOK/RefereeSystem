@@ -1,7 +1,9 @@
 @inherits LayoutComponentBase
 @using RefereeSystem.Client.Services
+@using Blazored.LocalStorage
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthStateProvider
+@inject ILocalStorageService LocalStorage
 @inject NavigationManager NavManager
 @implements IDisposable
 
@@ -11,18 +13,38 @@
     </div>
 
     <main>
-        <div class="top-row px-4 d-flex justify-content-between">
-            <div>
-                @if (timeLeft.TotalSeconds > 0)
-                {
-                    <span class="@GetTimerColor() fw-bold">
-                        <i class="bi bi-clock-history me-1"></i>
-                        Sesja wygasa za: @timeLeft.ToString(@"mm\:ss")
-                    </span>
-                }
-            </div>
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-items-center gap-3 w-100 justify-content-end">
 
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+                        <div class="d-flex align-items-center text-dark">
+                            <i class="bi bi-person-circle fs-5 me-2 text-success"></i>
+                            <span class="fw-bold">@context.User.Identity?.Name</span>
+                        </div>
+
+                        <div class="vr"></div>
+
+                        @if (timeLeft.TotalSeconds > 0)
+                        {
+                            <span class="@GetTimerColor() fw-bold" style="min-width: 90px; text-align: right;">
+                                <i class="bi bi-clock-history me-1"></i>
+                                @timeLeft.ToString(@"mm\:ss")
+                            </span>
+                        }
+
+                        <button class="btn btn-outline-danger btn-sm ms-2" @onclick="Logout" title="Wyloguj">
+                            <i class="bi bi-power"></i>
+                        </button>
+                    </div>
+                </Authorized>
+
+                <NotAuthorized>
+                    <a href="https://www.laczynaspilka.pl/" target="_blank" class="ms-auto text-decoration-none text-muted small">
+                        £¹czy Nas Pi³ka <i class="bi bi-box-arrow-up-right ms-1"></i>
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
 
         <article class="content px-4">
@@ -39,11 +61,8 @@
     protected override async Task OnInitializedAsync()
     {
         NavManager.LocationChanged += OnLocationChanged;
-
-        // Pobierz datê wygaœniêcia na starcie
         await UpdateExpirationDate();
 
-        // Uruchom zegar (tyka co 1 sekundê)
         _timer = new System.Timers.Timer(1000);
         _timer.Elapsed += async (sender, e) => await OnTimerTick();
         _timer.AutoReset = true;
@@ -52,22 +71,21 @@
 
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        // Przy zmianie strony odœwie¿ datê (bo mo¿e token siê odœwie¿y³ lub zmieni³)
         await UpdateExpirationDate();
-        await OnTimerTick(); // Wymuœ natychmiastowe przeliczenie
+        await OnTimerTick();
+
+        // Safety check: restart timer if stopped
+        if (_timer != null && !_timer.Enabled) _timer.Start();
     }
 
     private async Task UpdateExpirationDate()
     {
-        // SprawdŸ, czy provider to faktycznie nasza customowa klasa
         if (AuthStateProvider is CustomAuthStateProvider authProvider)
         {
             tokenExpiration = await authProvider.GetTokenExpirationAsync();
         }
         else
         {
-            // Jeœli to ServerAuthenticationStateProvider (np. podczas prerenderowania),
-            // nie rób nic lub ustaw domyœln¹ wartoœæ.
             tokenExpiration = DateTime.MinValue;
         }
     }
@@ -80,7 +98,6 @@
         }
         else
         {
-            // Oblicz ró¿nicê: Kiedy wygasa - Aktualny czas UTC
             var diff = tokenExpiration - DateTime.UtcNow;
 
             if (diff.TotalSeconds > 0)
@@ -89,29 +106,40 @@
             }
             else
             {
-                // CZAS MIN¥£!
+                // Time's up!
                 timeLeft = TimeSpan.Zero;
-                _timer.Stop();
+                tokenExpiration = DateTime.MinValue; // Stop trying to calculate diff
 
-                // Wymuœ wylogowanie (tylko jeœli mamy custom providera)
-                if (AuthStateProvider is CustomAuthStateProvider authProvider)
-                {
-                    await authProvider.CheckTokenExpiration();
-                    NavManager.NavigateTo("/login");
-                }
+                // Do not stop timer, just logout
+                await Logout();
             }
         }
-
-        // Wa¿ne: Musimy powiedzieæ Blazorowi, ¿e zmienne siê zmieni³y i trzeba przerysowaæ licznik
         await InvokeAsync(StateHasChanged);
     }
 
-    // Dodatek wizualny: Zmienia kolor na czerwony, gdy zosta³o mniej ni¿ 2 minuty
     private string GetTimerColor()
     {
-        if (timeLeft.TotalMinutes < 2) return "text-danger"; // Czerwony
-        if (timeLeft.TotalMinutes < 5) return "text-warning"; // ¯ó³ty/Pomarañczowy
-        return "text-success"; // Zielony
+        if (timeLeft.TotalMinutes < 2) return "text-danger";
+        if (timeLeft.TotalMinutes < 5) return "text-warning";
+        return "text-success";
+    }
+
+    private async Task Logout()
+    {
+        // 1. Reset local timer variables immediately so UI updates fast
+        tokenExpiration = DateTime.MinValue;
+        timeLeft = TimeSpan.Zero;
+
+        // 2. Perform actual logout logic
+        if (AuthStateProvider is CustomAuthStateProvider authProvider)
+        {
+            await LocalStorage.RemoveItemAsync("authToken"); // Clear token manually first
+            authProvider.NotifyUserLogout(); // Tell app state changed
+            NavManager.NavigateTo("/login");
+        }
+
+        // 3. Force UI refresh (Crucial for AuthorizeView to switch to NotAuthorized)
+        StateHasChanged();
     }
 
     public void Dispose()
