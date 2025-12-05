@@ -5,6 +5,7 @@ using RefereeSystem.Components; // Twój g³ówny komponent Blazor
 using RefereeSystem.Models; // Tutaj jest Twój RefereeDbContext
 using System.Text;
 using Blazored.LocalStorage;
+using RefereeSystem.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,9 @@ builder.Services.AddAuthorization(); // Dodajemy autoryzacjê
 // D. Konfiguracja Blazora (To ju¿ mia³eœ, zostawiamy bez zmian)
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
+
+// E. Dodajemy nasz serwis cykliczny do aktualizacji statusów meczów
+builder.Services.AddHostedService<MatchStatusUpdater>();
 
 var app = builder.Build();
 
