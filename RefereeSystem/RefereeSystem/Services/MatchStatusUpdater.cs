@@ -3,7 +3,6 @@ using RefereeSystem.Models;
 
 namespace RefereeSystem.Services
 {
-    // BackgroundService to wbudowana w .NET klasa do zadań cyklicznych
     public class MatchStatusUpdater : BackgroundService
     {
         private readonly IServiceScopeFactory _scopeFactory;
@@ -17,57 +16,30 @@ namespace RefereeSystem.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Serwis aktualizacji statusów meczów uruchomiony.");
+            _logger.LogInformation("Serwis automatycznej aktualizacji meczów uruchomiony.");
 
-            // Pętla działająca dopóki aplikacja jest włączona
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await UpdateMatchesStatus();
+                    using (var scope = _scopeFactory.CreateScope())
+                    {
+                        var context = scope.ServiceProvider.GetRequiredService<RefereeDbContext>();
+
+                        // Wywołanie procedury, która robi całą robotę w bazie
+                        await context.Database.ExecuteSqlRawAsync("CALL auto_complete_old_matches()");
+
+                        // Opcjonalnie: Logowanie tylko dla pewności (można usunąć, żeby nie śmiecić)
+                        // _logger.LogInformation("Wywołano procedurę auto_complete_old_matches.");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Błąd podczas aktualizacji statusów meczów.");
+                    _logger.LogError(ex, "Błąd podczas wywoływania procedury auto_complete_old_matches.");
                 }
 
-                // Czekaj 5 minut przed kolejnym sprawdzeniem (zmień wg uznania)
+                // Sprawdzaj co 5 minut (częstsze sprawdzanie nie jest konieczne)
                 await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
-            }
-        }
-
-        private async Task UpdateMatchesStatus()
-        {
-            // BackgroundService jest Singletonem (działa stale), a DbContext jest Scoped (na żądanie).
-            // Musimy ręcznie stworzyć "zakres" (scope), żeby pobrać bazę danych.
-            using (var scope = _scopeFactory.CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<RefereeDbContext>();
-
-                // 1. Obliczamy czas graniczny: Teraz minus 3 godziny
-                var cutOffTime = DateTime.Now.AddHours(-3);
-
-                // 2. Szukamy meczów, które:
-                // - Data rozpoczęcia jest starsza niż 3h temu
-                // - Status NIE JEST jeszcze "ODBYL_SIE"
-                // - Status NIE JEST "ODWOLANY" ani "PRZERWANY" (żeby ich nie nadpisać!)
-                var matchesToUpdate = await context.Matches
-                    .Where(m => m.MatchDate < cutOffTime
-                                && m.Status != "ODBYL_SIE"
-                                && m.Status != "ODWOLANY"
-                                && m.Status != "PRZERWANY")
-                    .ToListAsync();
-
-                if (matchesToUpdate.Any())
-                {
-                    foreach (var match in matchesToUpdate)
-                    {
-                        match.Status = "ODBYL_SIE";
-                    }
-
-                    await context.SaveChangesAsync();
-                    _logger.LogInformation($"Zaktualizowano {matchesToUpdate.Count} meczów na status ODBYL_SIE.");
-                }
             }
         }
     }
