@@ -32,7 +32,7 @@ namespace RefereeSystem.Services
                 }
 
                 // Czekaj 5 minut przed kolejnym sprawdzeniem (zmień wg uznania)
-                await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
         }
 
