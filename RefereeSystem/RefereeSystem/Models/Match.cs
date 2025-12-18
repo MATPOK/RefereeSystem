@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization; // <--- 1. WAŻNE: Dodaj to
 
 namespace RefereeSystem.Models
@@ -8,8 +9,12 @@ namespace RefereeSystem.Models
     {
         public int Id { get; set; }
         public DateTime MatchDate { get; set; }
-        public string HomeTeam { get; set; } = null!;
-        public string AwayTeam { get; set; } = null!;
+        public int HomeTeamId { get; set; }
+        [ForeignKey("HomeTeamId")]
+        public Team HomeTeam { get; set; }
+        public int AwayTeamId { get; set; }
+        [ForeignKey("AwayTeamId")]
+        public Team AwayTeam { get; set; }
         public string Location { get; set; } = null!;
         public string? Status { get; set; }
 

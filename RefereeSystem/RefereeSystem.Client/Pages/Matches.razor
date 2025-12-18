@@ -1,66 +1,113 @@
 ﻿@page "/matches"
-@rendermode InteractiveWebAssembly
 @using RefereeSystem.Client.Models
 @using Microsoft.AspNetCore.Authorization
 @using System.Text.Json
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Admin,Scheduler")]
 @inject HttpClient Http
 @inject IJSRuntime JS
 
-<PageTitle>Obsada | RefAPP</PageTitle>
+<PageTitle>Zarządzanie Meczami | RefAPP</PageTitle>
 
 <h3>Zarządzanie Meczami i Obsadą</h3>
 
 @if (matches == null)
 {
-    <p><em>Ładowanie meczów...</em></p>
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2">Ładowanie danych...</p>
+    </div>
 }
 else
 {
     <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-light">Dodaj nowy mecz</div>
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-plus-circle me-2"></i> Dodaj nowy mecz</span>
+
+            <button class="btn btn-light btn-sm text-success fw-bold" @onclick="OpenTeamModal">
+                <i class="bi bi-shield-plus"></i> Dodaj Zespół
+            </button>
+        </div>
         <div class="card-body">
-            <EditForm Model="@newMatch" OnValidSubmit="AddMatch" FormName="addMatchForm">
+            <EditForm Model="@newMatch" OnValidSubmit="AddMatch">
                 <DataAnnotationsValidator />
-                <div class="row g-2">
-                    <div class="col-md-3"><InputText @bind-Value="newMatch.HomeTeam" class="form-control" placeholder="Gospodarze" /></div>
-                    <div class="col-md-3"><InputText @bind-Value="newMatch.AwayTeam" class="form-control" placeholder="Goście" /></div>
-                    <div class="col-md-3"><InputText @bind-Value="newMatch.Location" class="form-control" placeholder="Lokalizacja" /></div>
-                    <div class="col-md-2"><InputDate @bind-Value="newMatch.MatchDate" Type="InputDateType.DateTimeLocal" class="form-control" /></div>
-                    <div class="col-md-1"><button type="submit" class="btn btn-success w-100">Dodaj</button></div>
+
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted">Data</label>
+                        <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="newMatch.MatchDate" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">Gospodarz</label>
+                        <InputSelect class="form-select" @bind-Value="newMatch.HomeTeam">
+                            <option value="">-- Wybierz --</option>
+                            @foreach (var t in teams)
+                            {
+                                <option value="@t.Name">@t.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">Gość</label>
+                        <InputSelect class="form-select" @bind-Value="newMatch.AwayTeam">
+                            <option value="">-- Wybierz --</option>
+                            @foreach (var t in teams)
+                            {
+                                <option value="@t.Name">@t.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted">Lokalizacja</label>
+                        <InputText @bind-Value="newMatch.Location" class="form-control" placeholder="Miasto/Stadion" />
+                    </div>
+
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100">Dodaj Mecz</button>
+                    </div>
                 </div>
             </EditForm>
         </div>
     </div>
 
-    <table class="table table-hover align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>Data</th>
-                <th>Mecz</th>
-                <th>Lokalizacja</th>
-                <th>Status</th>
-                <th>Akcje</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var match in matches)
-            {
+    <div class="table-responsive shadow-sm">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
                 <tr>
-                    <td>@match.MatchDate.ToString("dd.MM.yyyy HH:mm")</td>
-                    <td><strong>@match.HomeTeam</strong> - @match.AwayTeam</td>
-                    <td>@match.Location</td>
-                    <td><span class="badge @GetStatusColor(match.Status)">@match.Status</span></td>
-                    <td>
-                        <button class="btn btn-primary btn-sm me-2" @onclick="() => OpenAssignmentModal(match)">
-                            <i class="bi bi-people-fill"></i> Obsada
-                        </button>
-                        <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteMatch(match.Id)">Usuń</button>
-                    </td>
+                    <th>Data</th>
+                    <th>Spotkanie</th>
+                    <th>Lokalizacja</th>
+                    <th>Status</th>
+                    <th class="text-end">Akcje</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var match in matches)
+                {
+                    <tr>
+                        <td>@match.MatchDate.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>
+                            <span class="fw-bold">@match.HomeTeam</span>
+                            <span class="text-muted mx-1">vs</span>
+                            <span class="fw-bold">@match.AwayTeam</span>
+                        </td>
+                        <td>@match.Location</td>
+                        <td><span class="badge @GetStatusColor(match.Status)">@match.Status</span></td>
+                        <td class="text-end">
+                            <button class="btn btn-primary btn-sm me-2" @onclick="() => OpenAssignmentModal(match)">
+                                <i class="bi bi-people-fill"></i> Obsada
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteMatch(match.Id)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 
     @if (selectedMatch != null)
     {
@@ -73,49 +120,84 @@ else
                         <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
                     </div>
                     <div class="modal-body">
-
+                        <div class="alert alert-info py-2"><small>Walidacja konfliktów +/- 4h aktywna.</small></div>
                         <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label fw-bold">Sędzia Główny <span class="text-danger">*</span></label>
+                            <label class="col-sm-4 fw-bold">Sędzia Główny *</label>
                             <div class="col-sm-8">
-                                <RefereeSelect Users="refereesList"
-                                               @bind-SelectedUserId="mainRefId"
-                                               Placeholder="Brak" />
+                                <select class="form-select" @bind="mainRefId">
+                                    <option value="0">-- Wybierz --</option>
+                                    @foreach (var u in refereesList)
+                                    {
+                                        <option value="@u.Id">@u.LastName @u.FirstName</option>
+                                    }
+                                </select>
                             </div>
                         </div>
-
                         <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label">Asystent I <span class="text-danger">*</span></label>
+                            <label class="col-sm-4">Asystent I *</label>
                             <div class="col-sm-8">
-                                <RefereeSelect Users="refereesList"
-                                               @bind-SelectedUserId="asst1RefId"
-                                               Placeholder="Brak" />
+                                <select class="form-select" @bind="asst1RefId">
+                                    <option value="0">-- Wybierz --</option>
+                                    @foreach (var u in refereesList)
+                                    {
+                                        <option value="@u.Id">@u.LastName @u.FirstName</option>
+                                    }
+                                </select>
                             </div>
                         </div>
-
                         <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label">Asystent II <span class="text-danger">*</span></label>
+                            <label class="col-sm-4">Asystent II *</label>
                             <div class="col-sm-8">
-                                <RefereeSelect Users="refereesList"
-                                               @bind-SelectedUserId="asst2RefId"
-                                               Placeholder="Brak" />
+                                <select class="form-select" @bind="asst2RefId">
+                                    <option value="0">-- Wybierz --</option>
+                                    @foreach (var u in refereesList)
+                                    {
+                                        <option value="@u.Id">@u.LastName @u.FirstName</option>
+                                    }
+                                </select>
                             </div>
                         </div>
-
-                        <hr />
-
                         <div class="mb-3 row">
-                            <label class="col-sm-4 col-form-label text-muted">Sędzia Techniczny (Opcjonalny)</label>
+                            <label class="col-sm-4 text-muted">Techniczny</label>
                             <div class="col-sm-8">
-                                <RefereeSelect Users="refereesList"
-                                               @bind-SelectedUserId="techRefId"
-                                               Placeholder="Brak" />
+                                <select class="form-select" @bind="techRefId">
+                                    <option value="0">-- Brak --</option>
+                                    @foreach (var u in refereesList)
+                                    {
+                                        <option value="@u.Id">@u.LastName @u.FirstName</option>
+                                    }
+                                </select>
                             </div>
                         </div>
-
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Anuluj</button>
-                        <button type="button" class="btn btn-success" @onclick="SaveAssignments">Zapisz Obsadę</button>
+                        <button class="btn btn-secondary" @onclick="CloseModal">Anuluj</button>
+                        <button class="btn btn-success" @onclick="SaveAssignments">Zapisz</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showTeamModal)
+    {
+        <div class="modal-backdrop fade show" style="z-index: 1050;"></div>
+        <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055;">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="bi bi-shield-plus"></i> Nowy Zespół</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="CloseTeamModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Nazwa drużyny</label>
+                            <input type="text" class="form-control" @bind="newTeamName" placeholder="np. Real Madryt" autofocus />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="CloseTeamModal">Anuluj</button>
+                        <button class="btn btn-success" @onclick="SaveNewTeam">Zapisz Zespół</button>
                     </div>
                 </div>
             </div>
@@ -124,53 +206,49 @@ else
 }
 
 @code {
-    private List<Match>? matches;
+    // --- DANE ---
+    private List<MatchDto>? matches;
+    private List<Team> teams = new();
     private List<User> refereesList = new();
-    private Match newMatch = new Match { MatchDate = DateTime.Now };
+    private MatchDto newMatch = new() { MatchDate = DateTime.Now.AddDays(1) };
 
-    // Stan modala
-    private Match? selectedMatch;
+    // --- KONTEKST MODALI ---
+    private MatchDto? selectedMatch; // Modal Obsady
+    private bool showTeamModal = false; // Modal Zespołu
+    private string newTeamName = "";
 
-    // Zmienne przechowujące wybrane ID dla każdej roli
-    private int mainRefId;
-    private int asst1RefId;
-    private int asst2RefId;
-    private int techRefId;
+    // --- ID SĘDZIÓW ---
+    private int mainRefId, asst1RefId, asst2RefId, techRefId;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadMatches();
-        await LoadReferees();
-    }
+    protected override async Task OnInitializedAsync() => await LoadData();
 
-    private async Task LoadMatches()
-    {
-        matches = await Http.GetFromJsonAsync<List<Match>>("api/matches") ?? new List<Match>();
-    }
-
-    private async Task LoadReferees()
+    private async Task LoadData()
     {
         try
         {
-            var list = await Http.GetFromJsonAsync<List<User>>("api/assignments/referees") ?? new List<User>();
-            // Sortowanie dla porządku
-            refereesList = list.OrderBy(u => u.LastName).ToList();
+            matches = await Http.GetFromJsonAsync<List<MatchDto>>("api/matches");
+            teams = await Http.GetFromJsonAsync<List<Team>>("api/teams") ?? new List<Team>();
+            var refs = await Http.GetFromJsonAsync<List<User>>("api/assignments/referees") ?? new List<User>();
+            refereesList = refs.OrderBy(u => u.LastName).ToList();
         }
-        catch
-        {
-            Console.WriteLine("Błąd pobierania sędziów");
-            refereesList = new List<User>();
-        }
+        catch (Exception ex) { Console.WriteLine($"Błąd: {ex.Message}"); }
     }
 
+    // --- LOGIKA MECZÓW ---
     private async Task AddMatch()
     {
+        if (string.IsNullOrWhiteSpace(newMatch.HomeTeam) || string.IsNullOrWhiteSpace(newMatch.AwayTeam))
+        {
+            await JS.InvokeVoidAsync("alert", "Wybierz obie drużyny!");
+            return;
+        }
         var res = await Http.PostAsJsonAsync("api/matches", newMatch);
         if (res.IsSuccessStatusCode)
         {
-            newMatch = new Match { MatchDate = DateTime.Now };
-            await LoadMatches();
+            newMatch = new MatchDto { MatchDate = DateTime.Now.AddDays(1) };
+            await LoadData();
         }
+        else await JS.InvokeVoidAsync("alert", "Błąd dodawania meczu.");
     }
 
     private async Task DeleteMatch(int id)
@@ -178,114 +256,85 @@ else
         if (await JS.InvokeAsync<bool>("confirm", "Usunąć mecz?"))
         {
             await Http.DeleteAsync($"api/matches/{id}");
-            await LoadMatches();
+            await LoadData();
+        }
+    }
+
+    // --- LOGIKA NOWEGO ZESPOŁU ---
+    private void OpenTeamModal()
+    {
+        newTeamName = "";
+        showTeamModal = true;
+    }
+    private void CloseTeamModal() => showTeamModal = false;
+
+    private async Task SaveNewTeam()
+    {
+        if (string.IsNullOrWhiteSpace(newTeamName)) return;
+
+        var newTeam = new Team { Name = newTeamName };
+        var res = await Http.PostAsJsonAsync("api/teams", newTeam);
+
+        if (res.IsSuccessStatusCode)
+        {
+            await JS.InvokeVoidAsync("alert", "Zespół dodany!");
+            await LoadData(); // Odświeża listę w dropdownach
+            CloseTeamModal();
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "Błąd: Być może taki zespół już istnieje.");
         }
     }
 
     // --- LOGIKA OBSADY ---
-
-    private async Task OpenAssignmentModal(Match match)
+    private async Task OpenAssignmentModal(MatchDto match)
     {
         selectedMatch = match;
-
-        // Reset formularza
         mainRefId = 0; asst1RefId = 0; asst2RefId = 0; techRefId = 0;
-
-        // Pobierz aktualną obsadę z bazy
         try
         {
-            var currentAssignments = await Http.GetFromJsonAsync<List<AssignmentDto>>($"api/assignments/by-match/{match.Id}");
-
-            if (currentAssignments != null)
+            var assigns = await Http.GetFromJsonAsync<List<AssignmentDto>>($"api/assignments/by-match/{match.Id}");
+            if (assigns != null)
             {
-                mainRefId = currentAssignments.FirstOrDefault(a => a.Function == "MAIN")?.RefereeId ?? 0;
-                asst1RefId = currentAssignments.FirstOrDefault(a => a.Function == "ASST1")?.RefereeId ?? 0;
-                asst2RefId = currentAssignments.FirstOrDefault(a => a.Function == "ASST2")?.RefereeId ?? 0;
-                techRefId = currentAssignments.FirstOrDefault(a => a.Function == "TECH")?.RefereeId ?? 0;
+                mainRefId = assigns.FirstOrDefault(a => a.Function == "MAIN")?.RefereeId ?? 0;
+                asst1RefId = assigns.FirstOrDefault(a => a.Function == "ASST1")?.RefereeId ?? 0;
+                asst2RefId = assigns.FirstOrDefault(a => a.Function == "ASST2")?.RefereeId ?? 0;
+                techRefId = assigns.FirstOrDefault(a => a.Function == "TECH")?.RefereeId ?? 0;
             }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Błąd pobierania obsady: {ex.Message}");
-        }
+        catch { }
     }
 
     private void CloseModal() => selectedMatch = null;
 
     private async Task SaveAssignments()
     {
-        // 1. Walidacja
         if (mainRefId == 0 || asst1RefId == 0 || asst2RefId == 0)
         {
-            await JS.InvokeVoidAsync("alert", "Sędzia Główny i obaj Asystenci są wymagani!");
-            return;
+            await JS.InvokeVoidAsync("alert", "Wymagany Główny i Asystenci!"); return;
         }
 
-        // Duplikaty
-        var ids = new List<int> { mainRefId, asst1RefId, asst2RefId };
-        if (techRefId != 0) ids.Add(techRefId);
+        var roles = new[] { "MAIN", "ASST1", "ASST2", "TECH" };
+        foreach (var r in roles) await Http.DeleteAsync($"api/assignments/{selectedMatch!.Id}/{r}");
 
-        if (ids.Distinct().Count() != ids.Count)
+        string errorLog = "";
+        async Task Add(string f, int id)
         {
-            await JS.InvokeVoidAsync("alert", "Nie możesz wybrać tego samego sędziego do dwóch ról!");
-            return;
+            if (id == 0) return;
+            var r = await Http.PostAsync($"api/assignments?matchId={selectedMatch.Id}&refereeId={id}&function={f}", null);
+            if (!r.IsSuccessStatusCode) errorLog += $"{f}: Błąd/Konflikt\n";
         }
 
-        // RESET starej obsady
-        var rolesToRemove = new[] { "MAIN", "ASST1", "ASST2", "TECH" };
-        foreach (var role in rolesToRemove)
+        await Add("MAIN", mainRefId); await Add("ASST1", asst1RefId);
+        await Add("ASST2", asst2RefId); await Add("TECH", techRefId);
+
+        if (string.IsNullOrEmpty(errorLog))
         {
-            await Http.DeleteAsync($"api/assignments/{selectedMatch.Id}/{role}");
+            await JS.InvokeVoidAsync("alert", "Zapisano!"); CloseModal();
         }
-
-        // ZAPIS nowej
-        string errorMessages = "";
-
-        async Task AddRole(string func, int rId)
-        {
-            if (rId == 0) return;
-
-            var response = await Http.PostAsync(
-                $"api/assignments?matchId={selectedMatch.Id}&refereeId={rId}&function={func}",
-                null);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                string msg = "Błąd serwera";
-                try
-                {
-                    using var doc = JsonDocument.Parse(errorBody);
-                    if (doc.RootElement.TryGetProperty("error", out var errorEl)) msg = errorEl.ToString();
-                    else msg = errorBody;
-                }
-                catch { if (!string.IsNullOrEmpty(errorBody)) msg = errorBody; }
-
-                errorMessages += $"- {func}: {msg}\n";
-            }
-        }
-
-        await AddRole("MAIN", mainRefId);
-        await AddRole("ASST1", asst1RefId);
-        await AddRole("ASST2", asst2RefId);
-        await AddRole("TECH", techRefId);
-
-        if (string.IsNullOrEmpty(errorMessages))
-        {
-            await JS.InvokeVoidAsync("alert", "Obsada zapisana pomyślnie!");
-            CloseModal();
-            await LoadMatches();
-        }
-        else
-        {
-            await JS.InvokeVoidAsync("alert", $"Wystąpiły błędy:\n{errorMessages}");
-        }
+        else await JS.InvokeVoidAsync("alert", errorLog);
     }
 
-    private string GetStatusColor(string status) => status switch
-    {
-        "ODBYL_SIE" => "bg-success",
-        "PRZERWANY" => "bg-danger",
-        _ => "bg-secondary"
-    };
+    private string GetStatusColor(string s) => s == "ODBYL_SIE" ? "bg-success" : (s == "PRZERWANY" ? "bg-danger" : "bg-secondary");
 }

@@ -104,7 +104,7 @@ namespace RefereeSystem.Controllers
                 claims: claims,
                 // TUTAJ ZMIANA: Ustawiamy czas wygasania (np. 1 godzina od teraz)
                 // Zaleca się używanie DateTime.UtcNow zamiast DateTime.Now dla spójności serwerowej
-                expires: DateTime.UtcNow.AddMinutes(10),
+                expires: DateTime.UtcNow.AddMinutes(0.5),
                 signingCredentials: creds
             );
 
